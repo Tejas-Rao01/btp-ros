@@ -105,8 +105,6 @@ def pose_callback(data):
     	
     	
             
-            
-            
 if __name__ == '__main__':
 
     #intialising a node for the vizualisation part 
