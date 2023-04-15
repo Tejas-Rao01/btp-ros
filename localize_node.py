@@ -95,7 +95,8 @@ def pose_callback(data):
 
     if plot_vars !=[]:
         print("publishing")
-        plot_data = plot_data2Str(plot_vars)
+        X1,robotX, robotY, robotTheta, walls = plot_vars
+        plot_data = plot_data2Str(robotX, robotY, robotTheta, P, walls)
         pub.publish(plot_data)
         
     else:
