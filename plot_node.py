@@ -24,28 +24,14 @@ robot_orientation =[]
 #defining two axes and figures for plotting 
 fig, ax1 = plt.subplots()
 
-#Plot world walls 
-
-wall1_x = [2.4, 2.4]
-wall1_y = [-2.945, 3.14]
-
-wall1, = ax1.plot(wall1_x, wall1_y,'g-')
-
-wall2_x = [2.38, -0.2]
-wall2_y = [2.83, 2.83]
-
-wall2, = ax1.plot(wall2_x, wall2_y, 'g-')
-
 #plot robot
 
-robot_coord = ax1.scatter([0], [0], c='black')
+
 X_cor = [0.0, 1.0]
 Y_cor = [0.0, 0.0]
 heading_1, = ax1.plot(X_cor, Y_cor,'b-') # plotting the intial heading from start to another point 
-# =============================================================================
-# cov_ellipse, = ax1.plot(X_cor, Y_cor, 'b-')
-# =============================================================================
-
+cov_ellipse, = ax1.plot(X_cor, Y_cor, 'b-')
+robot_pos_plt = ax1.scatter(0,0,c='g')
 
 lines = ax1.plot(np.empty((0, 100)), np.empty((0, 100)),color='black', lw=2)
 ax1.set(xlim=(-8,8), ylim=(-8,8))
@@ -118,8 +104,6 @@ def pose_callback(data):
     print("callback")
     #acessing the required global variables 
     
-    
-    
     """
     variables to unpack - robot_X, robotY, robotTheta, P, walls
     """
@@ -141,10 +125,8 @@ def pose_callback(data):
     global traj
     global trajectory_x
     global trajectory_y
-# =============================================================================
-#     global cov_ellipse
-# =============================================================================
-    global robot_coord
+    global cov_ellipse
+    global robot_pos_plt
     #finding th erequired points to be plotted 
     X = []
     Y = []
@@ -179,29 +161,16 @@ def pose_callback(data):
     x, y = ellipse_data(angle, a, b)
     
     heading_x = [robotX, robotX + 1*np.cos(robotTheta)]
-    heading_y = [[robotY, robotY + 1*np.sin(robotTheta)]]
+    heading_y = [robotY, robotY + 1*np.sin(robotTheta)]
     heading_1.set_xdata(heading_x)
     heading_1.set_ydata(heading_y)
+    robot_pos_plt.set_offsets([robotX, robotY])
     
-# =============================================================================
-#     cov_ellipse.set_xdata(x)
-#     cov_ellipse.set_ydata(y)
-# =============================================================================
+    cov_ellipse.set_xdata(x)
+    cov_ellipse.set_ydata(y)
     traj.set_data(trajectory_x, trajectory_y)
     
-    
-    print('X')
-    print(robotX)
-    print('Y')
-    print(robotY)
-    print('Theta')
-    print(robotTheta)
-    print('P')
-    print(P)
-# =============================================================================
-#     robot_coord.set_xdata(robotX)
-#     robot_coord.set_ydata(robotY)
-# =============================================================================
+    print('robotX, robotY, robotTheta :', robotX, robotY, robotTheta)
     time.sleep(0.1)
 
             
