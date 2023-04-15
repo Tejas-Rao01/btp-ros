@@ -45,28 +45,29 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     if len(detected_walls) == 0:
         return robotX_bar, robotY_bar, robotTheta_bar, Pbar
     
-
     tick = -1
 
-    innovation_stack = np.zeros(shape=(2,1))
-    H_stack = np.zeros(shape=(2,3))
-    R_stack = np.zeros(shape=(2, 2))
-        
-    for i in range(1):   
+    innovation_stack = np.zeros(shape=(2*len(detected_walls),1))
+    H_stack = np.zeros(shape=(2*len(detected_walls),3))
+    R_stack = np.zeros(shape=(2*len(detected_walls), 2))
+    wall_inds = []
+    for i in range(len(detected_walls)):   
         zi = np.array([[detected_walls[i][0]],[ detected_walls[i][1]]])   
-        flag, zhati,innovation,H, alpha= get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar, Pbar, R)
+        flag, zhati, innovation, H, alpha, ind = get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar, Pbar, R)
 
         if not flag:
             continue
-
+# =============================================================================
+#         print('zi')
+#         print(zi)
+# =============================================================================
         tick += 1
-
+        wall_inds.append(i)
         innovation_stack[tick*2:tick*2+2,:] = innovation
         H_stack[tick*2:tick*2 +2,:] = H
         R = block_diag(R, localization_constants.R)
      
     print(tick)    
-                  
     if tick ==-1:
         return [robotX_bar, robotY_bar, robotTheta_bar, Pbar, walls]
     
@@ -85,8 +86,11 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
         robotTheta = robotTheta - math.pi * 2
     if robotTheta < -math.pi:
         robotTheta = robotTheta + math.pi * 2 
-
-    return [robotX, robotY, robotTheta, P, walls]
+    
+    corresponded_walls = []
+    for ind in wall_inds:
+        corresponded_walls.append(walls[ind])
+    return [robotX, robotY, robotTheta, P, corresponded_walls]
 
 
 
@@ -162,12 +166,12 @@ def get_Q(SL, SR):
 
 
 def world2robot(alpha, r, robotX, robotY, robotTheta):
-    alpha_dash = alpha + math.pi/2 - robotTheta
+    alpha_dash = alpha  - robotTheta
     r_dash = r - (robotX * np.cos(alpha) + robotY * np.sin(alpha))
     return [alpha_dash, r_dash ]
 
 def get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar,Pbar, R):
-
+    ind = 0
     alpha_measured, r_measured = zi 
     zi = np.array(zi).reshape((2,1))
     max_dist = np.inf
@@ -182,27 +186,42 @@ def get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar,Pbar, R):
         H = np.array([[0, 0, -1],[-np.cos(alpha_world), -np.sin(alpha_world), 0]])
         Sigma_inn = np.add(np.matmul(np.matmul(H, Pbar), np.transpose(H)), localization_constants.R)
         alpha_pred = alpha_pred % (2 * np.pi)
+# =============================================================================
+#         print('alpha_pred',alpha_pred)
+#         print('alpha_measured',alpha_measured)
+#         
+# =============================================================================
         alpha_inn = alpha_measured - alpha_pred
+# =============================================================================
+#         print('alpha_inn',alpha_inn)
+# =============================================================================
         if alpha_inn > np.pi:
             alpha_inn -= np.pi * 2
         elif alpha_inn < -np.pi:
             alpha_inn += np.pi * 2 
-            
+# =============================================================================
+#         print('alpha_inn',alpha_inn)   
+# =============================================================================
         innovation = np.array([alpha_inn, r_measured - r_pred]).reshape((2,1))
 
         maha_dist =   np.matmul(np.transpose(innovation ), np.matmul(np.linalg.inv(Sigma_inn), innovation))
-        if maha_dist.squeeze() < max_dist and maha_dist.squeeze() < 20:
+        if maha_dist.squeeze() < max_dist and maha_dist.squeeze() < 0.5:
+# =============================================================================
+#             print('maha distance', maha_dist)
+# =============================================================================
             flag = True
             max_dist = maha_dist.squeeze()
             zhati = np.array([alpha_pred, r_pred]).reshape((2,1))
             alpha = alpha_world
             inn = innovation
             H_final = H
+            ind = i
     if flag:
-    
-        return True, zhati, inn, H_final, alpha
+        print('zi zhati')
+        print(zi, zhati)
+        return True, zhati, inn, H_final, alpha, ind
     else:
-        return False, -1, -1,-1,-1
+        return False, -1, -1,-1,-1,-1
     
     
 def get_H(alpha):   
@@ -211,37 +230,6 @@ def get_H(alpha):
 # convert robotframe to origin 
 
         
-if __name__ =="__main__":
-    
-    
-    file = open('/home/shreyash/Desktop/slam/scan.txt', 'r')
-    lidar_data = []
-    for f in file.readlines():
-        lidar_point = list(map(float, f.strip().split(' ')))
-        lidar_data.append(lidar_point)
-        
-
-    
-    robotX, robotY, robotTheta = [1.1, -2.15, 0]
-    robotPos = [robotX, robotY, robotTheta]
-    SL, SR = 0,0
-    P = np.eye(3)
-
-    # Checking wall detection
-    # Todo - fix detection 
-    wall_detector = wall_detection.wall_detection(lidar_data, robotX, robotY, robotTheta)
-    detected_walls = wall_detector.detected_walls(False)
-
-    
-
-
-    #  checking ekf for 0 input
-    for i in range(1):
-        print(f'iter {i}')
-        [robotX, robotY, robotTheta, P,_] = kalman_filter(robotPos, lidar_data, P, SL, SR)
-    print(robotX)
-    print(robotY)
-    print(robotTheta)
 
 
 

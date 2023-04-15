@@ -89,6 +89,7 @@ def pose_callback(data):
     P = np.eye(3)
     lidar_data = data.ranges
     step_size = data.angle_increment
+    
     print('robotx before', robotX)
     robotX, robotY, robotTheta, unrobotX, unrobotY, unrobotTheta, P, plot_vars=  wall_localization.localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, unrobotX, unrobotY, unrobotTheta, P)
     print('robotX after', robotX)
@@ -105,8 +106,6 @@ def pose_callback(data):
     	
     	
     	
-            
-            
             
 if __name__ == '__main__':
 
