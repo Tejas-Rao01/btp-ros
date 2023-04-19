@@ -51,29 +51,33 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     H_stack = np.zeros(shape=(2*len(detected_walls),3))
     R_stack = np.zeros(shape=(2*len(detected_walls), 2))
     wall_inds = []
+    which_wall = []
     for i in range(len(detected_walls)):   
-        zi = np.array([[detected_walls[i][0]],[ detected_walls[i][1]]])   
+        zi = np.array([[detected_walls[i][0]], [detected_walls[i][1]]])   
         flag, zhati, innovation, H, alpha, ind = get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar, Pbar, R)
 
         if not flag:
             continue
-# =============================================================================
-#         print('zi')
-#         print(zi)
-# =============================================================================
+        which_wall.append(ind)
         tick += 1
         wall_inds.append(i)
         innovation_stack[tick*2:tick*2+2,:] = innovation
         H_stack[tick*2:tick*2 +2,:] = H
         R = block_diag(R, localization_constants.R)
      
-    print(tick)    
+
+     
+# =============================================================================
+#     print(tick)    
+# =============================================================================
+    corresponded_walls = []
     if tick ==-1:
-        return [robotX_bar, robotY_bar, robotTheta_bar, Pbar, walls]
+        return [robotX_bar, robotY_bar, robotTheta_bar, Pbar,corresponded_walls, walls]
     
     
     H_stack = H_stack[0:tick*2+2,:]
     R_stack = R[0:tick*2+2,0:tick*2+2]
+
     innovation_stack = innovation_stack[0:tick*2+2,:]
     
     K,Sigma_inn = compute_kalman_gain(Pbar, H_stack, R_stack) 
@@ -87,10 +91,13 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     if robotTheta < -math.pi:
         robotTheta = robotTheta + math.pi * 2 
     
-    corresponded_walls = []
+    
+    
     for ind in wall_inds:
         corresponded_walls.append(walls[ind])
-    return [robotX, robotY, robotTheta, P, corresponded_walls]
+
+
+    return [robotX, robotY, robotTheta, P, corresponded_walls, walls]
 
 
 
@@ -178,6 +185,7 @@ def get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar,Pbar, R):
     zhati = np.array([[], []])
     flag = False
     for i in range(len(localization_constants.world_walls)):
+
         [alpha_world, r_world] = localization_constants.world_walls[i]
         [alpha_pred, r_pred] = world2robot(alpha_world, r_world, robotX_bar, robotY_bar, robotTheta_bar)
         if alpha_pred < 0:
@@ -217,8 +225,7 @@ def get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar,Pbar, R):
             H_final = H
             ind = i
     if flag:
-        print('zi zhati')
-        print(zi, zhati)
+
         return True, zhati, inn, H_final, alpha, ind
     else:
         return False, -1, -1,-1,-1,-1

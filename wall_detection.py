@@ -25,16 +25,16 @@ class wall_detection():
       self.LidarPoints = []
       
      
-      self.epsilon = 0.1
+      self.epsilon = 0.05
       self.Min_SeedSeg_len = 5
      
-      self.Min_PTS_LS = 6
+      self.Min_PTS_LS = 7
       self.Delta = 1
      
       self.Num_Pts= len(lidar_data)
       self.Gmax = 1
-      self.Min_LS_len = 0.4
-      self.Min_distp2p = 0.2
+      self.Min_LS_len = 0.6
+      self.Min_distp2p = 0.05
       self.sub_sample_lidar(sub_sample_rate=3)
      
       self.lidar_data2coord()
@@ -192,7 +192,7 @@ class wall_detection():
         r = self.dist_p2l([0,0], line_params)
         p = self.projection_point2line([0,0], m, c)
         
-        alpha= np.arctan2(p[1], p[0]) + math.pi/2
+        alpha= np.arctan2(p[1], p[0])
 
         if alpha < 0:
             alpha = np.pi + (np.pi + alpha)
