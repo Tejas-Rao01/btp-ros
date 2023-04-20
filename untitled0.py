@@ -24,15 +24,13 @@ robot_orientation = []
 
 
 # Localized robot Parameters
-robotTheta_lidar = 0
-robotX_lidar = 0.2
-robotY_lidar = 0
+robotX = -0.2
+robotY = 0 
+robotTheta = 0
 
-robotX_centre = robotX_lidar - 0.2 *  np.cos(robotTheta_lidar)
-robotY_centre = robotY_lidar - 0.2 *  np.sin(robotTheta_lidar) 
-robotTheta_centre = robotTheta_lidar 
-
-
+unrobotX = robotX
+unrobotY = 0
+unrobotTheta = 0 
 P = np.zeros(shape=(3,3))
 
 #  Pioneer Params
@@ -47,7 +45,7 @@ wally = []
 trajectory_x = []
 trajectory_y = []
 
-def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, walls, coords):
+def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, walls):
     plot_vars = f'{robotX} {robotY} {robotTheta} \n'
     plot_vars += f'{p_X} {p_Y} {p_Theta} \n'
     P_str = ''
@@ -70,78 +68,47 @@ def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, 
         p_str = f'{p1[0]} {p1[1]} {p2[0]} {p2[1]} '
         plot_vars += p_str
         plot_vars += '\n'
-    
-    X, Y = coords
-    for x in X:
-        plot_vars += str(x) + ' '
-    plot_vars += '\n'
-    
-    for y in Y:
-        plot_vars += str(y) + ' '
-
-        
     return plot_vars
     
 
-def odom_callback(data):
+
+def callback(laser_data, odom_data):
     print('odom callback')
     
-    global robotX_centre
-    global robotY_centre
-    global robotTheta_centre
-    
-    global robotX_lidar
-    global robotY_lidar
-    global robotTheta_lidar
-    
+    global robotX
+    global robotY 
+    global robotTheta 
     global p_X
     global p_Y
     global p_Theta
     
-    p_Xnew = data.pose.pose.position.x
-    p_Ynew = data.pose.pose.position.y
-    p_Thetanew = data.pose.pose.orientation.x
+    p_Xnew = odom_data.pose.pose.position.x
+    p_Ynew = odom_data.pose.pose.position.y
+    p_Thetanew = odom_data.pose.pose.orientation.x
     
     delta_x = p_Xnew - p_X
     delta_y = p_Ynew - p_Y
     delta_theta = p_Thetanew - p_Theta
     
-    robotTheta_centre = robotTheta_centre + delta_theta
-    robotX_centre = robotX_centre + delta_x 
-    robotY_centre = robotY_centre + delta_y 
-    
-    
-    robotX_lidar = robotX_centre + 0.2 * np.cos(robotTheta_centre)
-    robotY_lidar = robotY_centre + 0.2 * np.sin(robotTheta_centre)
-    robotTheta_lidar = robotTheta_centre
+    robotTheta = robotTheta + delta_theta
+    robotX = robotX + delta_x + 0.2 * np.cos(robotTheta)
+    robotY = robotY + delta_y + 0.2 * np.sin(robotTheta)
     
     p_X = p_Xnew
     p_Y = p_Ynew
     p_Theta = p_Thetanew
     
-    print('robotXcentre, robotYcentre', robotX_centre, robotY_centre)
-    print('P_X, P_Y', p_X, p_Y)
-    time.sleep(0.6)
+    print('robotX robotY ', robotX, robotY)
+    print('deltax , delta y', delta_x, delta_y)
     
     
-def pose_callback(data):
-    print("callback")
-    
-    
-    
-    tick = time.time()
     #acessing the required global variables 
     global robot_position_x
     global robot_position_y
 
-    global robotX_centre
-    global robotY_centre
-    global robotTheta_centre
-    
-    global robotX_lidar
-    global robotY_lidar
-    global robotTheta_lidar
-    
+    global robotX
+    global robotY
+    global robotTheta
     global unrobotX
     global unrobotY
     global unrobotTheta
@@ -158,35 +125,26 @@ def pose_callback(data):
     Y = []
     odometry_data =[0,0,0]
     P = np.eye(3)
-    lidar_data = data.ranges
-    step_size = data.angle_increment
+    lidar_data = laser_data.ranges
+    step_size = laser_data.angle_increment
     
 # =============================================================================
-#     print('robotx before', robotX_centre)
+#     print('robotx before', robotX)
 # =============================================================================
-    robotX_lidar, robotY_lidar, robotTheta_lidar, P, plot_vars=  wall_localization.localize(lidar_data, step_size, odometry_data, robotX_lidar, robotY_lidar, robotTheta_lidar, P)
-    robotX_centre = robotX_lidar - 0.2 * np.cos(robotTheta_lidar)
-    robotY_centre = robotY_lidar - 0.2 * np.sin(robotTheta_lidar)
-    robotTheta_centre = robotTheta_lidar
+    robotX, robotY, robotTheta, P, plot_vars=  wall_localization.localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, unrobotX, unrobotY, unrobotTheta, P)
 # =============================================================================
-#     print('robotX after', robotX_centre)
+#     print('robotX after', robotX)
 # =============================================================================
 # =============================================================================
 #     print('PX, PY', p_X, p_Y)
 # =============================================================================
-    
 
-    tock = time.time()
-    print('time taken ', tock - tick)
     if plot_vars !=[]:
 # =============================================================================
 #         print("publishing")
 # =============================================================================
         X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
-        
-
-        print('robotPos', robotX_centre, robotY_centre, robotTheta_centre)
-        plot_data = plot_data2Str(robotX_centre, robotY_centre, robotTheta_centre, p_X, p_Y, p_Theta, P,corr_walls, walls, X1)
+        plot_data = plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P,corr_walls, walls)
         pub.publish(plot_data)
         
     else:
@@ -200,9 +158,10 @@ if __name__ == '__main__':
     
     pub = rospy.Publisher("plot_data", String, queue_size=1)
     #subscribing the required topic and updating its callback function 
-    laser_sub = rospy.Subscriber("/scan", LaserScan, pose_callback,queue_size=1)
-    pos_sub = rospy.Subscriber("/RosAria/pose", Odometry, odom_callback,queue_size=1)
-    
+    laser_sub = rospy.Subscriber("/scan", LaserScan)
+    pos_sub = rospy.Subscriber("/RosAria/pose", Odometry)
+    ts = message_filters.TimeSynchronizer([laser_sub, pos_sub], 10)
+    ts.registerCallback(callback)
     plt.show(block=True)
     
     rospy.spin()

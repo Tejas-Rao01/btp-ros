@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import wall_ekf
 import numpy as np
 
-def localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta,unrobotX, unrobotY, unrobotTheta, P):
+def localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, P):
     
     
     lidar_data = process_lidar_data(lidar_data, step_size)
@@ -22,21 +22,24 @@ def localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta,un
     # Check 
     [odomTime, SL, SR] = odometry_data
         
-    [unrobotX, unrobotY, unrobotTheta] = get_pred_pos(SL, SR, unrobotX, unrobotY, unrobotTheta)    
+
     #walls = []
-    robotX, robotY, robotTheta, P, walls = wall_ekf.kalman_filter([robotX, robotY, robotTheta], lidar_data, P, SL, SR)
+    robotX, robotY, robotTheta, P, corresponded_walls, walls = wall_ekf.kalman_filter([robotX, robotY, robotTheta], lidar_data, P, SL, SR)
+
     #print("robotX, robotY, robotTheta", robotX, robotY, robotTheta)
     #plot_walls(walls, robotX, robotY, robotTheta)
     #plt.scatter(robotX, robotY, marker='x')
+    X1 = [[0],[0]]
 # =============================================================================
-#     X1 = []
-#     X1= get_world_coords(robotX, robotY, robotTheta, lidar_data)
+#     X1 = get_world_coords(robotX, robotY, robotTheta, lidar_data)
+# =============================================================================
+# =============================================================================
 #     plot_world_coords(X1)
-#     
 # =============================================================================
-    X1 = []    
-    plot_vars = [X1, robotX, robotY, robotTheta, walls]
-    return  [robotX, robotY, robotTheta, unrobotX, unrobotY, unrobotTheta, P, plot_vars]#, lidar_world]
+    
+     
+    plot_vars = [X1, robotX, robotY, robotTheta, corresponded_walls, walls]
+    return  [robotX, robotY, robotTheta, P, plot_vars]#, lidar_world]
 
 def plot_world_coords(coords):
     for coord in coords:
@@ -64,27 +67,27 @@ def get_dist(cylinder, world_cylinder):
     return dist
     
 def get_world_coords(robotX, robotY, robotTheta, lidar_data):
+ 
+    xs = []
+    ys = []
 
-    
-    coords = []
-
-    for i in range(len(lidar_data)):
-
+    for i in range(0,len(lidar_data),4):
         angle = robotTheta + lidar_data[i][0]
-
         r = lidar_data[i][1]
         x = robotX + r * math.cos(angle)
         y = robotY + r * math.sin(angle)
-
-        coords.append([x,y])
-              
+        xs.append(x)
+        ys.append(y)
+    
+    coords = [xs, ys]
     return coords
 
     
     
 def get_coords_wrt_robot(robotX, robotY, robotTheta, lidar_data):
-    coords = []
-    
+
+    xs = []
+    ys = []
     for i in range(len(lidar_data)):
 
         angle = lidar_data[i][0]
@@ -93,8 +96,9 @@ def get_coords_wrt_robot(robotX, robotY, robotTheta, lidar_data):
         x = 0 + r * math.cos(angle)
         y = 0 + r * math.sin(angle)
 
-        coords.append([x,y])
-              
+        xs.append(x)
+        ys.append(y)
+    coords = [xs, ys]              
     return coords      
 
 
@@ -182,16 +186,23 @@ def ellipse_data(angle, a, b):
     y = coord[1,:]
     return x, y
 
+
+def plot_map():
+    
+    plt.plot([2.4,2.4],[-3,3], color='green')
+    plt.plot([-0.5,2.4],[-2.83,-2.83], color='green')    
+    
+
 if __name__ =="__main__":
     
     
     data = np.load('lidar_scan.npy')
 
-    
-    lidar_data = data[30,3:]
-    step_size = data[30,2]
+    plot_map()
+    lidar_data = data[5,3:]
+    step_size = data[5,2]
 
-    robotX, robotY, robotTheta = [0, 0, 0]
+    robotX, robotY, robotTheta = [0,0,0]
     print('robot pos before : ', robotX, robotY, robotTheta)
     robotPos = [robotX, robotY, robotTheta]
     unrobotX, unrobotY, unrobotTheta = robotX, robotY, robotTheta
@@ -201,8 +212,8 @@ if __name__ =="__main__":
     
     odometry_data = [0, SL, SR]
     
-    robotX, robotY, robotTheta, unrobotX, unrobotY, unrobotTheta, P, plot_vars = localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta,unrobotX, unrobotY, unrobotTheta, P)
-    X1,robotX, robotY, robotTheta, walls = plot_vars
+    robotX, robotY, robotTheta, P, plot_vars = localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta,unrobotX, unrobotY, unrobotTheta, P)
+    X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
 
     print('robot pos after : ', robotX, robotY, robotTheta)
     plt.scatter(robotX, robotY, c='g')
@@ -227,6 +238,18 @@ if __name__ =="__main__":
         x = [p1[0][0], p2[0][0]]
         y = [p1[1][0], p2[1][0]]
 
-        plt.plot(x, y,'b')
-    print('walls')
-    print(walls)
+        plt.plot(x, y,'black')
+        
+    for wall in corr_walls:
+        p1, p2 = wall
+        p1 = list(p1)
+        p2 = list(p2)
+        p1.append(1)
+        p2.append(1)
+        p1 = np.matmul(transformation_mat, np.array(p1).reshape((3,1)))
+        p2 = np.matmul(transformation_mat, np.array(p2).reshape( (3,1)))
+
+        x = [p1[0][0], p2[0][0]]
+        y = [p1[1][0], p2[1][0]]
+
+        plt.plot(x, y,color='blue', markersize=10)

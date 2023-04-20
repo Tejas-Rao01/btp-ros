@@ -31,17 +31,18 @@ X_cor = [0.0, 1.0]
 Y_cor = [0.0, 0.0]
 heading_1, = ax1.plot(X_cor, Y_cor,'b-') # plotting the intial heading from start to another point 
 cov_ellipse, = ax1.plot(X_cor, Y_cor, 'b-')
-robot_pos_plt = ax1.scatter(0,0,c='g')
+robot_pos_plt = ax1.scatter(1,0,s=30,marker='^',c='g')
 
 lines = ax1.plot(np.empty((0, 100)), np.empty((0, 100)),color='black', lw=2)
 corr_lines = ax1.plot(np.empty((0, 100)), np.empty((0, 100)),color='blue', lw=2)
 ax1.set(xlim=(-8,8), ylim=(-8,8))
 traj, = ax1.plot([0, 0], [0, 0], 'blue')
-p_traj, = ax1.plot([0, 0], [0, 0], 'red')
-robotX = -1.5
+p_traj, = ax1.plot([0, 0], [0, 0], 'purple')
+robotX = -0.2
 robotY = 0 
 robotTheta = 0
 
+wall_scatter = ax1.scatter(0,0, c='r')
 p_X = robotX
 p_Y = 0
 p_Theta = 0 
@@ -93,8 +94,18 @@ def Str2plot_data(plot_str):
                 p1, p2 = [0,0], [0,0]
                 p1[0], p1[1], p2[0], p2[1] = list(map(float, line.split()))
                 line_list.append([p1, p2])
-            continue        
-    return robotX, robotY, robotTheta,p_X, p_Y, p_Theta, P, corr_line_list, line_list
+            continue    
+        if line_id == 4 + a + b:
+            Xs = list(map(float, line.split()))
+            continue
+        
+        if line_id == 5 + a + b:
+            Ys = list(map(float, line.split()))
+            continue 
+        
+
+        
+    return robotX, robotY, robotTheta,p_X, p_Y, p_Theta, P, corr_line_list, line_list, Xs, Ys
 
 def get_error_ellipse(covariance):
         """Return the position covariance (which is the upper 2x2 submatrix)
@@ -155,13 +166,14 @@ def pose_callback(data):
     global p_trajectory_x 
     global p_trajectory_y
     
+    global wall_scatter
     
     #finding th erequired points to be plotted 
     X = []
     Y = []
     odometry_data =[0,0,0]
     
-    robotX, robotY, robotTheta,p_X, p_Y, p_Theta, P,corr_walls,  walls = Str2plot_data(data)
+    robotX, robotY, robotTheta,p_X, p_Y, p_Theta, P,corr_walls,  walls, Xs, Ys = Str2plot_data(data)
     
     trajectory_x.append(robotX)
     trajectory_y.append(robotY)
@@ -172,6 +184,18 @@ def pose_callback(data):
     transformation_mat = np.array([ [np.cos(robotTheta), -np.sin(robotTheta), robotX],[np.sin(robotTheta), np.cos(robotTheta), robotY],[0,0,1]])
     tick= 0
     time.sleep(0.1)
+    
+    print('walls')
+    print(walls)
+    
+    print('corr walls')
+    print(corr_walls)
+    
+    
+    if walls == None:
+        print('no walls')
+        for i in range(len(lines)):
+            lines[i].set_data(0,0)
     for wall in walls:
         p1, p2 = wall
         p1 = list(p1)
@@ -188,6 +212,12 @@ def pose_callback(data):
         tick +=1
         if tick >= min(len(walls), len(lines)):
             break
+    
+    if corr_walls == []:
+        print('no corr walls')
+        for i in range(len(corr_lines)):
+            corr_lines[i].set_data(0,0)
+            
     
     for wall in corr_walls:
         p1, p2 = wall
@@ -214,7 +244,12 @@ def pose_callback(data):
     heading_1.set_xdata(heading_x)
     heading_1.set_ydata(heading_y)
     robot_pos_plt.set_offsets([robotX, robotY])
+    coords = []
+    for x, y in zip(Xs, Ys):
+        coords.append([x,y])
     
+    
+    wall_scatter.set_offsets(coords)
     cov_ellipse.set_xdata(x)
     cov_ellipse.set_ydata(y)
     traj.set_data(trajectory_x, trajectory_y)
