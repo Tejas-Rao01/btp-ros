@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 #importing the necessary Libraries required 
 import matplotlib.pyplot as plt #for plotting 
@@ -8,9 +9,11 @@ from geometry_msgs.msg import Twist #importing the messgae for publishing
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from std_msgs.msg import String
-import wall_localization
+import robot_params
 import time 
 import message_filters
+import localization_constants
+import wall_localization
 #setup paths
 cwd_path = os.path.dirname(os.path.abspath(__file__)) #gettting the parent directory path
 
@@ -24,8 +27,8 @@ robot_orientation = []
 
 
 # Localized robot Parameters
-robotTheta_lidar = 0
-robotX_lidar = 0.2
+robotTheta_lidar = 1.5
+robotX_lidar = 1.2
 robotY_lidar = 0
 
 robotX_centre = robotX_lidar - 0.2 *  np.cos(robotTheta_lidar)
@@ -34,7 +37,7 @@ robotTheta_centre = robotTheta_lidar
 
 
 P = np.zeros(shape=(3,3))
-
+P_odom = np.zeros(shape=(3,3))
 #  Pioneer Params
 p_X = 0
 p_Y = 0
@@ -47,6 +50,13 @@ wally = []
 trajectory_x = []
 trajectory_y = []
 
+SL = 0
+SR = 0
+
+
+px_old = 0
+py_old = 0
+ptheta_old = 0
 def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, walls, coords):
     plot_vars = f'{robotX} {robotY} {robotTheta} \n'
     plot_vars += f'{p_X} {p_Y} {p_Theta} \n'
@@ -78,9 +88,30 @@ def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, 
     
     for y in Y:
         plot_vars += str(y) + ' '
-
-        
+    plot_vars += '\n'
+# =============================================================================
+#     P_str = ''
+#     for i in range(3):
+#         for j in range(3):
+#             P_str += str(P_odom[i, j]) + ' '
+#     plot_vars += P_str
+#     plot_vars += '\n'
+#     
+#         
+# =============================================================================
     return plot_vars
+
+def odom_to_wheeldist(delta_x, delta_y, delta_theta):
+
+
+    delta_d = np.sqrt(delta_x **2 + delta_y **2 ) 
+    
+    sr = delta_d + delta_theta * robot_params.pioneer_track_width
+    sl = delta_d - delta_theta * robot_params.pioneer_track_width
+    
+    return [sr, sl]
+    
+    
     
 
 def odom_callback(data):
@@ -97,31 +128,35 @@ def odom_callback(data):
     global p_X
     global p_Y
     global p_Theta
+    global SR
+    global SL
     
-    p_Xnew = data.pose.pose.position.x
-    p_Ynew = data.pose.pose.position.y
-    p_Thetanew = data.pose.pose.orientation.x
+    global P_odom
     
+    p_Xnew = data.pose.pose.position.x + 1.2
+    p_Ynew = data.pose.pose.position.y + 1.5
+    p_Thetanew = data.pose.pose.orientation.x + np.pi / 2
+    
+
     delta_x = p_Xnew - p_X
     delta_y = p_Ynew - p_Y
     delta_theta = p_Thetanew - p_Theta
     
-    robotTheta_centre = robotTheta_centre + delta_theta
-    robotX_centre = robotX_centre + delta_x 
-    robotY_centre = robotY_centre + delta_y 
-    
-    
-    robotX_lidar = robotX_centre + 0.2 * np.cos(robotTheta_centre)
-    robotY_lidar = robotY_centre + 0.2 * np.sin(robotTheta_centre)
-    robotTheta_lidar = robotTheta_centre
+# =============================================================================
+#     robotTheta_centre = robotTheta_centre + delta_theta
+#     robotX_centre = robotX_centre + delta_x 
+#     robotY_centre = robotY_centre + delta_y 
+#     
+#     
+#     robotX_lidar = robotX_centre + 0.2 * np.cos(robotTheta_centre)
+#     robotY_lidar = robotY_centre + 0.2 * np.sin(robotTheta_centre)
+#     robotTheta_lidar = robotTheta_centre
+# =============================================================================
     
     p_X = p_Xnew
     p_Y = p_Ynew
     p_Theta = p_Thetanew
-    
-    print('robotXcentre, robotYcentre', robotX_centre, robotY_centre)
-    print('P_X, P_Y', p_X, p_Y)
-    time.sleep(0.6)
+
     
     
 def pose_callback(data):
@@ -153,28 +188,46 @@ def pose_callback(data):
     global p_X
     global p_Y
     global p_Theta
+    
+    global SR
+    global SL
+    
+    global px_old
+    global py_old
+    global ptheta_old
+    
+    
     #finding th erequired points to be plotted 
     X = []
     Y = []
-    odometry_data =[0,0,0]
+    odometry_data =[0,SR,SL]
     P = np.eye(3)
     lidar_data = data.ranges
     step_size = data.angle_increment
     
-# =============================================================================
-#     print('robotx before', robotX_centre)
-# =============================================================================
+    
+    
+    
+    delta_x = p_X - px_old
+    delta_y = p_Y - py_old
+    delta_theta = p_Theta - ptheta_old
+    SL, SR = odom_to_wheeldist(delta_x, delta_y, delta_theta)
+    
+    
+    px_old = p_X
+    py_old = p_Y
+    ptheta_old = p_Theta
+    
+    print('Px Py', p_X, p_Y, p_Theta)
+    print('robotX, robotY', robotX_centre, robotY_centre)
+    print('SL, SR', SL, SR)
+    
     robotX_lidar, robotY_lidar, robotTheta_lidar, P, plot_vars=  wall_localization.localize(lidar_data, step_size, odometry_data, robotX_lidar, robotY_lidar, robotTheta_lidar, P)
     robotX_centre = robotX_lidar - 0.2 * np.cos(robotTheta_lidar)
     robotY_centre = robotY_lidar - 0.2 * np.sin(robotTheta_lidar)
     robotTheta_centre = robotTheta_lidar
-# =============================================================================
-#     print('robotX after', robotX_centre)
-# =============================================================================
-# =============================================================================
-#     print('PX, PY', p_X, p_Y)
-# =============================================================================
     
+
 
     tock = time.time()
     print('time taken ', tock - tick)
@@ -186,7 +239,7 @@ def pose_callback(data):
         
 
         print('robotPos', robotX_centre, robotY_centre, robotTheta_centre)
-        plot_data = plot_data2Str(robotX_centre, robotY_centre, robotTheta_centre, p_X, p_Y, p_Theta, P,corr_walls, walls, X1)
+        plot_data = plot_data2Str(robotX_centre,robotY_centre, robotTheta_centre, p_X, p_Y, p_Theta, P,corr_walls, walls, X1)
         pub.publish(plot_data)
         
     else:

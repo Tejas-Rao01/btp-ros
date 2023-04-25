@@ -30,20 +30,18 @@ def localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, P
     #plot_walls(walls, robotX, robotY, robotTheta)
     #plt.scatter(robotX, robotY, marker='x')
     X1 = [[0],[0]]
-# =============================================================================
-#     X1 = get_world_coords(robotX, robotY, robotTheta, lidar_data)
-# =============================================================================
-# =============================================================================
-#     plot_world_coords(X1)
-# =============================================================================
+    
     
      
     plot_vars = [X1, robotX, robotY, robotTheta, corresponded_walls, walls]
     return  [robotX, robotY, robotTheta, P, plot_vars]#, lidar_world]
 
 def plot_world_coords(coords):
-    for coord in coords:
-        plt.scatter(coord[0], coord[1], c='r')
+    X = coords[0]
+    Y = coords[1]
+    for x,y in zip(X,Y):
+        
+        plt.scatter(x,y, c='r')
 
 def get_pred_pos(SL, SR,  robotX, robotY, robotTheta):
     
@@ -186,6 +184,76 @@ def ellipse_data(angle, a, b):
     y = coord[1,:]
     return x, y
 
+def clean_data(lidar_data, derivatives):
+    temp_lidar = [lidar_data[0]]
+    tick = 0
+    for i in range(1, len(lidar_data)-1):
+        if tick != 0:
+            tick -=1
+            continue 
+        angle, r  = lidar_data[i]
+        if derivatives[i-1] > 0.1 or derivatives[i-1] <-0.1:
+            tick = 10
+            continue
+        temp_lidar.append([angle, r])
+    
+    lidar_data = temp_lidar
+    return lidar_data
+    
+def compute_derivative(lidar_data):
+        
+    # Computing Derivatives 
+    derivative = []
+    for i in range(1,len(lidar_data)-1):
+        l = lidar_data[i-1][1]
+        r = lidar_data[i+1][1]
+        d = (r- l)/2
+        derivative.append(d)
+          
+    return derivative
+
+def detect_cyls(lidar_data, robotX, robotY, robotTheta):
+    
+    derivative = compute_derivative(lidar_data)
+    cylinders = []
+    start = False
+    for i in range(len(derivative)):
+
+        if derivative[i] < -localization_constants.cylinder_threshold_derivative :
+            start = True
+            avg_angle = 0
+            n_indices = 0
+            avg_depth = 0
+            n_indices = 0
+            avg_depth = 0 
+            avg_indice = 0
+            start = True
+        if start == True and derivative[i] > localization_constants.cylinder_threshold_derivative \
+            and n_indices > 0:
+            avg_indice  = avg_indice / n_indices
+            avg_angle = avg_angle / n_indices
+            avg_depth = avg_depth / n_indices + localization_constants.cylinder_offset
+            if avg_depth> 0.2:
+                print('avg_angle ',avg_angle *180 / math.pi)
+                theta = robotTheta + avg_angle -math.pi/2
+                print('localize2 x: ' ,robotX)
+                print('localize2 y: ' ,robotY)
+                print('localize2 t: ' ,robotTheta)
+                
+                x = robotX + avg_depth * math.cos(theta)
+                y = robotY + avg_depth * math.sin(theta)                
+                cylinders.append([x, y, avg_depth, avg_angle])
+            
+            start = False
+        if start == True:
+            avg_angle += lidar_data[i+1][0]
+          #  print('lidar data angle ',lidar_data[i+1][0])
+            avg_indice += i
+            n_indices += 1
+            avg_depth += lidar_data[i+1][1]
+        
+    
+    return [cylinders, derivative]
 
 def plot_map():
     
@@ -212,7 +280,7 @@ if __name__ =="__main__":
     
     odometry_data = [0, SL, SR]
     
-    robotX, robotY, robotTheta, P, plot_vars = localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta,unrobotX, unrobotY, unrobotTheta, P)
+    robotX, robotY, robotTheta, P, plot_vars = localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, P)
     X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
 
     print('robot pos after : ', robotX, robotY, robotTheta)
@@ -253,3 +321,17 @@ if __name__ =="__main__":
         y = [p1[1][0], p2[1][0]]
 
         plt.plot(x, y,color='blue', markersize=10)
+    
+    lidar_data = process_lidar_data(lidar_data, step_size)
+    [cylinders, derivatives] = detect_cyls(lidar_data, robotX, robotY, robotTheta)
+    print('cylinders',cylinders)
+    print('len cylinder', len(cylinders))
+    
+    lidar_data = clean_data(lidar_data, derivatives)
+    coords = get_coords_wrt_robot(robotX, robotY, robotTheta, lidar_data)
+    
+    plot_world_coords(coords)
+    plt.axis('equal')
+    
+    
+    

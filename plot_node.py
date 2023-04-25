@@ -8,6 +8,7 @@ from geometry_msgs.msg import Twist #importing the messgae for publishing
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String
 import wall_localization
+import robot_params
 import time 
 
 #setup paths
@@ -26,21 +27,28 @@ fig, ax1 = plt.subplots()
 
 #plot robot
 
+wall_begining = [[0, 0], [0, 0], [23.692, 0], [23.692, 7.244], [20.991, 23.692], [0.25999999999999784, 35.087], [0.25999999999999784, 35.087], [14.669999999999998, 35.087], [14.669999999999998, 28.482000000000003], [14.669999999999998, 27.959000000000003], [14.955999999999998, 27.959000000000003], [14.955999999999998, 24.224000000000004], [14.669999999999998, 24.224000000000004], [-2.0155849343766715e-15, 32.917], [-8.959000000000001, 35.087], [-8.959000000000001, 32.917]]
+wall_end = [[0, 20.119], [23.692, 0], [23.692, 7.244], [20.991, 7.224], [20.991, 23.692], [14.669999999999998, 35.087], [-8.959000000000001, 35.087], [14.669999999999998, 34.146], [14.669999999999998, 27.959000000000003], [14.955999999999998, 27.959000000000003], [14.955999999999998, 24.224000000000004], [14.669999999999998, 24.224000000000004], [14.669999999999998, 23.570400000000003], [-1.5729363488248607e-15, 25.688000000000002], [-8.959000000000001, 32.917], [-2.0155849343766715e-15, 32.917]]
 
+for start_coord, end_coord in zip(wall_begining, wall_end):
+    x = [start_coord[0], end_coord[0]]
+    y = [start_coord[1], end_coord[1]]
+    
+    ax1.plot(x,y,'green')
 X_cor = [0.0, 1.0]
 Y_cor = [0.0, 0.0]
 heading_1, = ax1.plot(X_cor, Y_cor,'b-') # plotting the intial heading from start to another point 
 cov_ellipse, = ax1.plot(X_cor, Y_cor, 'b-')
-robot_pos_plt = ax1.scatter(1,0,s=30,marker='^',c='g')
+
 
 lines = ax1.plot(np.empty((0, 100)), np.empty((0, 100)),color='black', lw=2)
 corr_lines = ax1.plot(np.empty((0, 100)), np.empty((0, 100)),color='blue', lw=2)
-ax1.set(xlim=(-8,8), ylim=(-8,8))
+#ax1.set(xlim=(-8,8), ylim=(-8,8))
 traj, = ax1.plot([0, 0], [0, 0], 'blue')
 p_traj, = ax1.plot([0, 0], [0, 0], 'purple')
-robotX = -0.2
-robotY = 0 
-robotTheta = 0
+robotX = 1.2
+robotY = 1.3
+robotTheta = np.pi/2
 
 wall_scatter = ax1.scatter(0,0, c='r')
 p_X = robotX
@@ -57,11 +65,18 @@ trajectory_y = []
 p_trajectory_x = []
 p_trajectory_y = []
 
+
+SR = 0 
+SL = 0
+
+plt.axis('equal')
+robot_pos_plt = ax1.scatter(robotX,robotY,s=30,marker='^',c='g')
 def Str2plot_data(plot_str):
     #print(plot_str.data)
     lines = plot_str.data.split('\n')
 
     P = np.zeros(shape=(3,3))
+    odom_P = np.zeros(shape=(3,3))
     corr_line_list = []
     line_list = []
     for line_id, line in enumerate(lines):
@@ -102,7 +117,14 @@ def Str2plot_data(plot_str):
         if line_id == 5 + a + b:
             Ys = list(map(float, line.split()))
             continue 
-        
+# =============================================================================
+#         if line_id == 6 + a + b:
+#            P_data = list(map(float, line.split()))
+#            for i in range(3):
+#                for j in range(3):
+#                    odom_P[i, j] = P_data[i*3+ j]
+# =============================================================================
+   
 
         
     return robotX, robotY, robotTheta,p_X, p_Y, p_Theta, P, corr_line_list, line_list, Xs, Ys
@@ -167,6 +189,8 @@ def pose_callback(data):
     global p_trajectory_y
     
     global wall_scatter
+    global SR
+    global SL
     
     #finding th erequired points to be plotted 
     X = []
@@ -184,34 +208,38 @@ def pose_callback(data):
     transformation_mat = np.array([ [np.cos(robotTheta), -np.sin(robotTheta), robotX],[np.sin(robotTheta), np.cos(robotTheta), robotY],[0,0,1]])
     tick= 0
     time.sleep(0.1)
-    
-    print('walls')
-    print(walls)
-    
-    print('corr walls')
-    print(corr_walls)
-    
+# =============================================================================
+#     
+#     print('walls')
+#     print(walls)
+#     
+#     print('corr walls')
+#     print(corr_walls)
+#     
+# =============================================================================
     
     if walls == None:
         print('no walls')
         for i in range(len(lines)):
             lines[i].set_data(0,0)
-    for wall in walls:
-        p1, p2 = wall
-        p1 = list(p1)
-        p2 = list(p2)
-        p1.append(1)
-        p2.append(1)
-        p1 = np.matmul(transformation_mat, np.array(p1).reshape((3,1)))
-        p2 = np.matmul(transformation_mat, np.array(p2).reshape( (3,1)))
-
-        x = [p1[0][0], p2[0][0]]
-        y = [p1[1][0], p2[1][0]]
-
-        lines[tick].set_data(x,y)
-        tick +=1
-        if tick >= min(len(walls), len(lines)):
-            break
+# =============================================================================
+#     for wall in walls:
+#         p1, p2 = wall
+#         p1 = list(p1)
+#         p2 = list(p2)
+#         p1.append(1)
+#         p2.append(1)
+#         p1 = np.matmul(transformation_mat, np.array(p1).reshape((3,1)))
+#         p2 = np.matmul(transformation_mat, np.array(p2).reshape( (3,1)))
+# 
+#         x = [p1[0][0], p2[0][0]]
+#         y = [p1[1][0], p2[1][0]]
+# 
+#         lines[tick].set_data(x,y)
+#         tick +=1
+#         if tick >= min(len(walls), len(lines)):
+#             break
+# =============================================================================
     
     if corr_walls == []:
         print('no corr walls')
@@ -244,16 +272,23 @@ def pose_callback(data):
     heading_1.set_xdata(heading_x)
     heading_1.set_ydata(heading_y)
     robot_pos_plt.set_offsets([robotX, robotY])
+    
+    
+    cov_ellipse.set_xdata(x)
+    cov_ellipse.set_ydata(y)
+    
     coords = []
     for x, y in zip(Xs, Ys):
         coords.append([x,y])
     
     
     wall_scatter.set_offsets(coords)
-    cov_ellipse.set_xdata(x)
-    cov_ellipse.set_ydata(y)
+
     traj.set_data(trajectory_x, trajectory_y)
     p_traj.set_data(p_trajectory_x, p_trajectory_y)
+    
+    
+    print('ellipse data', x, y)
     print('robotX, robotY, robotTheta :', robotX, robotY, robotTheta)
     time.sleep(0.1)
 
@@ -266,6 +301,7 @@ if __name__ == '__main__':
 
     #subscribing the required topic and updating its callback function 
     rospy.Subscriber("/plot_data", String, pose_callback,queue_size=1)
+    plt.axis('equal')
     plt.show(block=True)
     
     rospy.spin()
