@@ -1,167 +1,62 @@
-#!/usr/bin/env python3
-#importing the necessary Libraries required 
-import matplotlib.pyplot as plt #for plotting 
-import numpy as np # the numerical python library
-import rospy #python library for ros
-import os # python library for system file path
-from geometry_msgs.msg import Twist #importing the messgae for publishing 
-from sensor_msgs.msg import LaserScan
-from nav_msgs.msg import Odometry
-from std_msgs.msg import String
-import wall_localization
-import time 
-import message_filters
-#setup paths
-cwd_path = os.path.dirname(os.path.abspath(__file__)) #gettting the parent directory path
-
-#Setup plot
-plt.ion()# seeting up interactive mode
-
-#lists for stroing x position y position and orientation
-robot_position_x = []
-robot_position_y = []
-robot_orientation = []
+import numpy as np 
 
 
-# Localized robot Parameters
-robotX = -0.2
-robotY = 0 
-robotTheta = 0
 
-unrobotX = robotX
-unrobotY = 0
-unrobotTheta = 0 
-P = np.zeros(shape=(3,3))
-
-#  Pioneer Params
-p_X = 0
-p_Y = 0
-p_Theta = 0
-
-
-wallx = []
-wally = [] 
-
-trajectory_x = []
-trajectory_y = []
-
-def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, walls):
-    plot_vars = f'{robotX} {robotY} {robotTheta} \n'
-    plot_vars += f'{p_X} {p_Y} {p_Theta} \n'
-    P_str = ''
-    for i in range(3):
-        for j in range(3):
-            P_str += str(P[i, j]) + ' '
-    plot_vars += P_str
-    plot_vars += '\n'
-    plot_vars += str(len(corr_walls)) + ' '
-    plot_vars += str(len(walls))
-    plot_vars += '\n'
-    for corr_wall in corr_walls:
-        p1, p2 = corr_wall
-        p_str = f'{p1[0]} {p1[1]} {p2[0]} {p2[1]} '
-        plot_vars += p_str
-        plot_vars += '\n'
-
-    for wall in walls:
-        p1, p2 = wall
-        p_str = f'{p1[0]} {p1[1]} {p2[0]} {p2[1]} '
-        plot_vars += p_str
-        plot_vars += '\n'
-    return plot_vars
+def projection_point2line(point, m, c):
     
-
-
-def callback(laser_data, odom_data):
-    print('odom callback')
+    x, y = point 
+    if m != 0:
+      m2 = -1/m 
+      c2 = y - m2 * x
     
-    global robotX
-    global robotY 
-    global robotTheta 
-    global p_X
-    global p_Y
-    global p_Theta
-    
-    p_Xnew = odom_data.pose.pose.position.x
-    p_Ynew = odom_data.pose.pose.position.y
-    p_Thetanew = odom_data.pose.pose.orientation.x
-    
-    delta_x = p_Xnew - p_X
-    delta_y = p_Ynew - p_Y
-    delta_theta = p_Thetanew - p_Theta
-    
-    robotTheta = robotTheta + delta_theta
-    robotX = robotX + delta_x + 0.2 * np.cos(robotTheta)
-    robotY = robotY + delta_y + 0.2 * np.sin(robotTheta)
-    
-    p_X = p_Xnew
-    p_Y = p_Ynew
-    p_Theta = p_Thetanew
-    
-    print('robotX robotY ', robotX, robotY)
-    print('deltax , delta y', delta_x, delta_y)
-    
-    
-    #acessing the required global variables 
-    global robot_position_x
-    global robot_position_y
-
-    global robotX
-    global robotY
-    global robotTheta
-    global unrobotX
-    global unrobotY
-    global unrobotTheta
-    global odometry_data
-    global P
-
-    global lines
-    global pts
-    global p_X
-    global p_Y
-    global p_Theta
-    #finding th erequired points to be plotted 
-    X = []
-    Y = []
-    odometry_data =[0,0,0]
-    P = np.eye(3)
-    lidar_data = laser_data.ranges
-    step_size = laser_data.angle_increment
-    
-# =============================================================================
-#     print('robotx before', robotX)
-# =============================================================================
-    robotX, robotY, robotTheta, P, plot_vars=  wall_localization.localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, unrobotX, unrobotY, unrobotTheta, P)
-# =============================================================================
-#     print('robotX after', robotX)
-# =============================================================================
-# =============================================================================
-#     print('PX, PY', p_X, p_Y)
-# =============================================================================
-
-    if plot_vars !=[]:
-# =============================================================================
-#         print("publishing")
-# =============================================================================
-        X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
-        plot_data = plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P,corr_walls, walls)
-        pub.publish(plot_data)
-        
+      intersection_x = - (c - c2) / (m - m2)
+      intersection_y = m2 * intersection_x  + c2 
     else:
-    	print("publishing without localizing")
-    	
-    	
-if __name__ == '__main__':
+      intersection_x = x 
+      intersection_y = c
+    
+    return intersection_x, intersection_y
 
-    #intialising a node for the vizualisation part 
-    rospy.init_node('rover_visualisation', anonymous=True)
-    
-    pub = rospy.Publisher("plot_data", String, queue_size=1)
-    #subscribing the required topic and updating its callback function 
-    laser_sub = rospy.Subscriber("/scan", LaserScan)
-    pos_sub = rospy.Subscriber("/RosAria/pose", Odometry)
-    ts = message_filters.TimeSynchronizer([laser_sub, pos_sub], 10)
-    ts.registerCallback(callback)
-    plt.show(block=True)
-    
-    rospy.spin()
+def dist_p2p( p1, p2):
+
+    x = p1[0] - p2[0]
+    y = p1[1] - p2[1]
+
+    return np.sqrt(x ** 2 + y ** 2)
+
+def wallcoords_to_parametric(wall_beginning, wall_end):
+    world_walls = []
+    for start, end in zip(wall_beginning, wall_end):
+        print('start', start)
+        print('end', end)
+        x1, y1 = start
+        x2, y2 = end
+        
+        if x1 != x2:
+            m = (y2- y1)/ (x2 - x1)
+            c = y2 -m* x2    
+            proj_x, proj_y = projection_point2line([0,0], m, c)
+           
+            d = dist_p2p([proj_x, proj_y], [0,0])
+           
+            if d != 0:
+                
+                angle = np.arctan2(proj_y, proj_x)
+                world_walls.append([angle,d])
+           
+            if d == 0:
+                angle = np.arctan(m) + 3*np.pi / 2 
+                world_walls.append([angle,0])
+        
+        else:
+            
+            world_walls.append([np.pi, 0])
+                
+        
+    return world_walls
+
+wall_beginning = [[0, 0], [0, 0.000],[0.000, 20.0],[0, 23.700],[20.0 ,-1.73] ,[23.692, 0], [23.692, 7.244], [20.991, 23.692], [0.25999999999999784, 35.087], [0.25999999999999784, 35.087], [14.669999999999998, 35.087], [14.669999999999998, 28.482000000000003], [14.669999999999998, 27.959000000000003], [14.955999999999998, 27.959000000000003], [14.955999999999998, 24.224000000000004], [14.669999999999998, 24.224000000000004], [-2.0155849343766715e-15, 32.917], [-8.959000000000001, 35.087], [-8.959000000000001, 32.917]]
+wall_end = [[0, 20.119], [23.692, 0], [-1.73, 20],[-1.73, 23.7],[23.7, -1.73],[23.692, 7.244], [20.991, 7.224], [20.991, 23.692], [14.669999999999998, 35.087], [-8.959000000000001, 35.087], [14.669999999999998, 34.146], [14.669999999999998, 27.959000000000003], [14.955999999999998, 27.959000000000003], [14.955999999999998, 24.224000000000004], [14.669999999999998, 24.224000000000004], [14.669999999999998, 23.570400000000003], [-1.5729363488248607e-15, 25.688000000000002], [-8.959000000000001, 32.917], [-2.0155849343766715e-15, 32.917]]
+
+world_walls = wallcoords_to_parametric(wall_beginning, wall_end)
+print(world_walls)

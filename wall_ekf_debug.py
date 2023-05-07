@@ -14,6 +14,7 @@ import math
 import matplotlib.pyplot as plt
 import wall_detection
 from scipy.linalg import block_diag
+from fractions import Fraction
 # Redefine robotPos to be a np array
 def kalman_filter(robotPos, lidar_data, P, SL, SR):
     
@@ -46,15 +47,14 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
 #     print('len cylinder', len(cylinders))
 # =============================================================================
     
-# =============================================================================
-#     lidar_data = clean_data(lidar_data, derivatives)
-# =============================================================================
+    lidar_data = clean_data(lidar_data, derivatives)
     
     
     wall_detector = wall_detection.wall_detection(lidar_data, robotX_bar, robotY_bar, robotTheta_bar)
     detected_walls = wall_detector.detected_walls(flag = False)
-    
+
     walls = wall_detector.get_ls()
+
 
     if len(detected_walls) == 0:
         print('no walls detected')
@@ -67,6 +67,7 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     R_stack = np.zeros(shape=(2*len(detected_walls), 2))
     wall_inds = []
     which_wall = []
+    corresponded_walls_param = []
 # =============================================================================
 #     
 #     plot_scan(lidar_data, derivatives)
@@ -77,11 +78,10 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
 #     print('---------------------')
 #     print('beginning matching')
 # =============================================================================
-    detected_walls = []
     for i in range(len(detected_walls)):   
         zi = np.array([[detected_walls[i][0]], [detected_walls[i][1]]])   
         flag, zhati, innovation, H, alpha, ind = get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar, Pbar, R)
-
+        
         if not flag:
             continue
 # =============================================================================
@@ -107,7 +107,18 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
 # =============================================================================
 #     print(tick)    
 # =============================================================================
+    if len(walls) > 1:
+        for i in range(len(walls)):
+            for j in range(i+1,len(walls)):
+                corner = get_corner(walls[i], walls[j])
+                if corner:
+                    innovation, H = get_corresponding_corner(corner, robotX_bar, robotY_bar, robotTheta_bar, Pbar, R)
+            
+    
+    print('corresponed parametric walls', corresponded_walls_param)    
     corresponded_walls = []
+    
+    
 
     if tick ==-1:
 # =============================================================================
@@ -116,7 +127,13 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
 # =============================================================================
         return [robotX_bar, robotY_bar, robotTheta_bar, Pbar,corresponded_walls, walls]
     
-    
+    for i in range(len(corresponded_walls)):
+        for j in range(1,len(corresponded_walls)):
+            wall1 = corresponded_walls[i]
+            wall2 = corresponded_walls[j]
+            
+            corner = get_corner(wall1, wall2)
+            
     H_stack = H_stack[0:tick*2+2,:]
     R_stack = R[0:tick*2+2,0:tick*2+2]
 
@@ -124,22 +141,18 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     
     K,Sigma_inn = compute_kalman_gain(Pbar, H_stack, R_stack) 
     
-# =============================================================================
-#     print('H_stack')
-#     print(H_stack)
-#     
-#     print('R_stack')
-#     print(R_stack)
-# 
-#     print('innovatin_stack')
-#     print(innovation_stack)    
-#     
-#     print('before', robotX, robotY)
-# =============================================================================
+    print('H_stack')
+    print(H_stack)
+    
+    print('R_stack')
+    print(R_stack)
+
+    print('innovatin_stack')
+    print(innovation_stack)    
+    
+
     [robotX, robotY, robotTheta] = update_pos(robotX_bar, robotY_bar, robotTheta_bar, K, innovation_stack)
-# =============================================================================
-#     print('after', robotX_bar, robotY_bar)
-# =============================================================================
+
     
     
     P = update_uncertainity(Pbar, K, Sigma_inn)
@@ -151,21 +164,111 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
         robotTheta = robotTheta + math.pi * 2 
     
     
-
      
     for ind in wall_inds:
         print('wall ind', ind)
         corresponded_walls.append(walls[ind])
 
-# =============================================================================
-#     print(f'correspondence found, {len(corresponded_walls)} walls matched')
-#     print('--------------------------------')
-#     
-#     print('after',  robotX, robotY)
-# =============================================================================
+    print(f'correspondence found, {len(corresponded_walls)} walls matched')
+    print('--------------------------------')
+    
+    print('after',  robotX, robotY)
     
     print('returning')
     return [robotX, robotY, robotTheta, P, corresponded_walls, walls]
+
+
+def get_corresponding_corner(corner, robotX_bar, robotY_bar, robotTheta_bar, Pbar, R):
+    
+# =============================================================================
+#     H=  1/ (q*q) * np.array([[-q* dx, -q * dy, 0], [dy, -dx, -1*q*q]])
+# =============================================================================
+    
+    corner_x, corner_y = corner
+    dist = np.sqrt((corner_x - robotX_bar)**2 + (corner_y - robotY_bar)**2)
+    alpha = np.arctan2(corner_y - robotY_bar, corner_x - robotX_bar )
+    zi  = np.array([dist, alpha]).reshape((2,1))
+    
+    for world_corner in localization_constants.world_corners:
+        world_x, world_y = world_corner 
+        disti = np.sqrt((world_x - robotX_bar)**2 + (world_y- robotY_bar)**2)
+        alphai = np.arctan2(corner_y - robotY_bar, corner_x - robotX_bar) 
+        zhati = np.array([disti, alphai])
+        innovation = np.subtract(zi - zhati)
+                if 
+        
+        
+        
+        
+def points_2line(point1, point2):
+    x1,y1 = point1    
+    x2, y2 = point2       
+    if x1 == x2:
+      pass  
+    else:
+      m = (y2- y1) / (x2 - x1)
+      c = y2 -m * x2      
+    return m, c
+
+def line_tf_SI2G(m, c):
+
+    A, B, C = -m, 1, -c
+
+    if A < 0:
+        A, B, C = -A, -B, -C
+  
+    den_a = Fraction(A).limit_denominator(1000).as_integer_ratio()[1]
+    den_c = Fraction(C).limit_denominator(1000).as_integer_ratio()[1]
+    
+    gcd = np.gcd(den_a, den_c)
+    lcm = den_a * den_c / gcd
+    
+    A = A * lcm
+    B = B * lcm
+    C = C * lcm 
+
+    return A, B, C    
+
+def line_intersect_general(params1, params2):
+
+    a1, b1, c1 = params1
+    a2, b2, c2 = params2
+    
+    # check if lines arent parallel
+
+    if a1/a2 == b1/b2 and a1/a2 != c1/c2:
+      return None
+    
+    else:
+    
+      x = (c1 * b2 - b1 * c2) / (b1 * a2 - a1 * b2)
+      y = (a1 *c2 - a2 * c1) / (b1 *a2 - a1 * b2)
+    
+      return x, y
+
+def get_corner(wall1, wall2):
+    p11, p12 = wall1
+    p21, p22 = wall2
+    
+    
+    
+    
+    m1, c1 = points_2line(p11, p12)
+    m2, c2 = points_2line(p21, p22)
+    
+    
+    if abs(m1-m2) < 0.3:
+        return None 
+    
+    params1 = line_tf_SI2G( m1, c1)
+    params2 = line_tf_SI2G(m2, c2)
+    
+    
+    corner = line_intersect_general(params1, params2)
+    return corner 
+    
+    
+    
 
 def clean_data(lidar_data, derivatives):
     temp_lidar = [lidar_data[0]]
@@ -358,11 +461,9 @@ def get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar,Pbar, R):
     max_dist = np.inf
     zhati = np.array([[], []])
     flag = False
-# =============================================================================
-#     print()
-#     print(' --------------------------------------')
-#     print('matching')
-# =============================================================================
+    print()
+    print(' --------------------------------------')
+    print('matching')
     for i in range(len(localization_constants.world_walls)):
 
         [alpha_world, r_world] = localization_constants.world_walls[i]
@@ -374,31 +475,28 @@ def get_corresponding_wall(zi, robotX_bar, robotY_bar, robotTheta_bar,Pbar, R):
         Sigma_inn = np.add(np.matmul(np.matmul(H, Pbar), np.transpose(H)), localization_constants.R)
         alpha_pred = alpha_pred % (2 * np.pi)
         alpha_inn = alpha_measured - alpha_pred
-        
-# =============================================================================
-#         print('checking with world wall')
-#         print('measured', alpha_measured, r_measured)
-#         print('world', alpha_pred, r_pred)
-#         print('alpha_inn',alpha_inn)
-# =============================================================================
+        if alpha_inn < 0.5 and alpha_inn > -0.5:
+            print('checking with world wall')
+            print('in world frame', alpha_world, r_world)
+            print('measured', alpha_measured, r_measured)
+            print('world', alpha_pred, r_pred)
+            print('alpha_inn',alpha_inn)
         if alpha_inn > np.pi:
             alpha_inn -= np.pi * 2
         elif alpha_inn < -np.pi:
             alpha_inn += np.pi * 2 
-# =============================================================================
-#         print('alpha_inn',alpha_inn)   
-# =============================================================================
+        print('alpha_inn',alpha_inn)   
         innovation = np.array([alpha_inn, r_measured - r_pred]).reshape((2,1))
-
+        
         maha_dist =   np.matmul(np.transpose(innovation ), np.matmul(np.linalg.inv(Sigma_inn), innovation))
+        print('maha_dist',maha_dist)
+        
         if maha_dist.squeeze() < max_dist and maha_dist.squeeze() < 0.5:
-# =============================================================================
-#             print('maha distance', maha_dist)
-#             
-#             print('correspondence found')
-#             print('measured', alpha_measured, r_measured)
-#             print('world', alpha_pred, r_pred)
-# =============================================================================
+            print('maha distance', maha_dist)
+            
+            print('correspondence found')
+            print('measured', alpha_measured, r_measured)
+            print('world', alpha_pred, r_pred)
             flag = True
             max_dist = maha_dist.squeeze()
             zhati = np.array([alpha_pred, r_pred]).reshape((2,1))

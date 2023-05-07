@@ -30,20 +30,16 @@ def localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, P
     #plot_walls(walls, robotX, robotY, robotTheta)
     #plt.scatter(robotX, robotY, marker='x')
     X1 = [[0],[0]]
-# =============================================================================
-#     X1 = get_world_coords(robotX, robotY, robotTheta, lidar_data)
-# =============================================================================
-# =============================================================================
-#     plot_world_coords(X1)
-# =============================================================================
-    
-     
+
     plot_vars = [X1, robotX, robotY, robotTheta, corresponded_walls, walls]
     return  [robotX, robotY, robotTheta, P, plot_vars]#, lidar_world]
 
 def plot_world_coords(coords):
-    for coord in coords:
-        plt.scatter(coord[0], coord[1], c='r')
+    X = coords[0]
+    Y = coords[1]
+    for x,y in zip(X,Y):
+        
+        plt.scatter(x,y, c='r')
 
 def get_pred_pos(SL, SR,  robotX, robotY, robotTheta):
     
@@ -83,7 +79,6 @@ def get_world_coords(robotX, robotY, robotTheta, lidar_data):
     return coords
 
     
-    
 def get_coords_wrt_robot(robotX, robotY, robotTheta, lidar_data):
 
     xs = []
@@ -111,7 +106,7 @@ def process_lidar_data(lidar_data, step_size):
     #num of lidar points  
     num_points = len(lidar_data)
     
-    for i in range(num_points):        
+    for i in range(0,num_points,3):        
         r = lidar_data[i]
         if r == np.inf:
             angle += step_size 
@@ -119,8 +114,6 @@ def process_lidar_data(lidar_data, step_size):
         lidar_data_processed.append([angle, lidar_data[i]])       
         angle+= step_size
     return lidar_data_processed
-
-
 
 def plot_data2Str(robotX, robotY, robotTheta, P, walls):
     plot_vars = f'{robotX} {robotY} {robotTheta} \n'
@@ -186,70 +179,89 @@ def ellipse_data(angle, a, b):
     y = coord[1,:]
     return x, y
 
+def clean_data(lidar_data, derivatives):
+    temp_lidar = [lidar_data[0]]
+    tick = 0
+    for i in range(1, len(lidar_data)-1):
+        if tick != 0:
+            tick -=1
+            continue 
+        angle, r  = lidar_data[i]
+        if derivatives[i-1] > 0.1 or derivatives[i-1] <-0.1:
+            tick = 10
+            continue
+        temp_lidar.append([angle, r])
+    
+    lidar_data = temp_lidar
+    return lidar_data
+    
+def compute_derivative(lidar_data):
+        
+    # Computing Derivatives 
+    derivative = []
+    for i in range(1,len(lidar_data)-1):
+        l = lidar_data[i-1][1]
+        r = lidar_data[i+1][1]
+        d = (r- l)/2
+        derivative.append(d)
+          
+    return derivative
+
+def detect_cyls(lidar_data, robotX, robotY, robotTheta):
+    
+    derivative = compute_derivative(lidar_data)
+    cylinders = []
+    start = False
+    for i in range(len(derivative)):
+
+        if derivative[i] < -localization_constants.cylinder_threshold_derivative :
+            start = True
+            avg_angle = 0
+            n_indices = 0
+            avg_depth = 0
+            n_indices = 0
+            avg_depth = 0 
+            avg_indice = 0
+            start = True
+        if start == True and derivative[i] > localization_constants.cylinder_threshold_derivative \
+            and n_indices > 0:
+            avg_indice  = avg_indice / n_indices
+            avg_angle = avg_angle / n_indices
+            avg_depth = avg_depth / n_indices + localization_constants.cylinder_offset
+            if avg_depth> 0.2:
+# =============================================================================
+#                 print('avg_angle ',avg_angle *180 / math.pi)
+# =============================================================================
+                theta = robotTheta + avg_angle -math.pi/2
+# =============================================================================
+#                 print('localize2 x: ' ,robotX)
+#                 print('localize2 y: ' ,robotY)
+#                 print('localize2 t: ' ,robotTheta)
+# =============================================================================
+                
+                x = robotX + avg_depth * math.cos(theta)
+                y = robotY + avg_depth * math.sin(theta)                
+                cylinders.append([x, y, avg_depth, avg_angle])
+            
+            start = False
+        if start == True:
+            avg_angle += lidar_data[i+1][0]
+          #  print('lidar data angle ',lidar_data[i+1][0])
+            avg_indice += i
+            n_indices += 1
+            avg_depth += lidar_data[i+1][1]
+        
+    
+    return [cylinders, derivative]
 
 def plot_map():
+    wall_begining = [[0, 0], [0, 0], [23.692, 0], [23.692, 7.244], [20.991, 23.692], [0.25999999999999784, 35.087], [0.25999999999999784, 35.087], [14.669999999999998, 35.087], [14.669999999999998, 28.482000000000003], [14.669999999999998, 27.959000000000003], [14.955999999999998, 27.959000000000003], [14.955999999999998, 24.224000000000004], [14.669999999999998, 24.224000000000004], [-2.0155849343766715e-15, 32.917], [-8.959000000000001, 35.087], [-8.959000000000001, 32.917]]
+    wall_end = [[0, 20.119], [23.692, 0], [23.692, 7.244], [20.991, 7.224], [20.991, 23.692], [14.669999999999998, 35.087], [-8.959000000000001, 35.087], [14.669999999999998, 34.146], [14.669999999999998, 27.959000000000003], [14.955999999999998, 27.959000000000003], [14.955999999999998, 24.224000000000004], [14.669999999999998, 24.224000000000004], [14.669999999999998, 23.570400000000003], [-1.5729363488248607e-15, 25.688000000000002], [-8.959000000000001, 32.917], [-2.0155849343766715e-15, 32.917]]
     
-    plt.plot([2.4,2.4],[-3,3], color='green')
-    plt.plot([-0.5,2.4],[-2.83,-2.83], color='green')    
-    
-
-if __name__ =="__main__":
-    
-    
-    data = np.load('lidar_scan.npy')
-
-    plot_map()
-    lidar_data = data[5,3:]
-    step_size = data[5,2]
-
-    robotX, robotY, robotTheta = [0,0,0]
-    print('robot pos before : ', robotX, robotY, robotTheta)
-    robotPos = [robotX, robotY, robotTheta]
-    unrobotX, unrobotY, unrobotTheta = robotX, robotY, robotTheta
-    
-    SL, SR = 0,0
-    P = np.eye(3)
-    
-    odometry_data = [0, SL, SR]
-    
-    robotX, robotY, robotTheta, P, plot_vars = localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta,unrobotX, unrobotY, unrobotTheta, P)
-    X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
-
-    print('robot pos after : ', robotX, robotY, robotTheta)
-    plt.scatter(robotX, robotY, c='g')
-    
-    heading_x = [robotX, robotX + 1*np.cos(robotTheta)]
-    heading_y = [robotY, robotY + 1*np.sin(robotTheta)]
-    plt.plot(heading_x, heading_y)
-    
-    
-    plt.xlim(-6,6)
-    plt.ylim(-6,6)
-    transformation_mat = np.array([ [np.cos(robotTheta), -np.sin(robotTheta), robotX],[np.sin(robotTheta), np.cos(robotTheta), robotY],[0,0,1]])
-    for wall in walls:
-        p1, p2 = wall
-        p1 = list(p1)
-        p2 = list(p2)
-        p1.append(1)
-        p2.append(1)
-        p1 = np.matmul(transformation_mat, np.array(p1).reshape((3,1)))
-        p2 = np.matmul(transformation_mat, np.array(p2).reshape( (3,1)))
-
-        x = [p1[0][0], p2[0][0]]
-        y = [p1[1][0], p2[1][0]]
-
-        plt.plot(x, y,'black')
+    for start_coord, end_coord in zip(wall_begining, wall_end):
+        x = [start_coord[0], end_coord[0]]
+        y = [start_coord[1], end_coord[1]]
         
-    for wall in corr_walls:
-        p1, p2 = wall
-        p1 = list(p1)
-        p2 = list(p2)
-        p1.append(1)
-        p2.append(1)
-        p1 = np.matmul(transformation_mat, np.array(p1).reshape((3,1)))
-        p2 = np.matmul(transformation_mat, np.array(p2).reshape( (3,1)))
-
-        x = [p1[0][0], p2[0][0]]
-        y = [p1[1][0], p2[1][0]]
-
-        plt.plot(x, y,color='blue', markersize=10)
+        plt.plot(x,y,'green')
+ 
+    
