@@ -3,7 +3,7 @@
 Created on Tue Jan 31 10:37:37 2023
 @author: Tejas Rao
 """
-
+from numba import jit
 from fractions import Fraction
 from scipy.odr import * 
 import numpy as np 
@@ -16,7 +16,7 @@ import time
 class wall_detection():
 
     def __init__(self, lidar_data, robotX, robotY ,robotTheta):
-      tick = time.time()
+
       self.lidar_data = lidar_data
       self.robotX = robotX
       self.robotY = robotY
@@ -204,7 +204,7 @@ class wall_detection():
       m = -A/B
       c = -C/B
       return m, c
-    
+
     def line_tf_SI2G(self, m, c):
 
         A, B, C = -m, 1, -c

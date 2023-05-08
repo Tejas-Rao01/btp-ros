@@ -34,9 +34,10 @@ for start_coord, end_coord in zip(wall_begining, wall_end):
     y = [start_coord[1], end_coord[1]]
     
     ax1.plot(x,y,'green')
-X_cor = [0.0, 1.0]
+X_cor = [0.0, 0.0]
 Y_cor = [0.0, 0.0]
-heading_1, = ax1.plot(X_cor, Y_cor,'b-') # plotting the intial heading from start to another point 
+heading_1, = ax1.plot(X_cor, Y_cor,'g-') # plotting the intial heading from start to another point 
+heading_2, = ax1.plot(X_cor, Y_cor,'y-')
 cov_ellipse, = ax1.plot(X_cor, Y_cor, 'b-')
 
 
@@ -47,9 +48,9 @@ traj, = ax1.plot([0, 0], [0, 0], 'blue')
 p_traj, = ax1.plot([0, 0], [0, 0], 'purple')
 robotX = 1.2
 robotY = 1.3
-robotTheta = np.pi/2
+robotTheta = 0
 
-wall_scatter = ax1.scatter(50,50, c='r')
+wall_scatter = ax1.scatter(35,35, c='r')
 p_X = robotX
 p_Y = 0
 p_Theta = 0 
@@ -70,6 +71,7 @@ SL = 0
 
 plt.axis('equal')
 robot_pos_plt = ax1.scatter(robotX,robotY,s=30,marker='^',c='g')
+pioneer_pol_plt = ax1.scatter(robotX,robotY,s=30,marker='^',c='purple')
 def Str2plot_data(plot_str):
     #print(plot_str.data)
     lines = plot_str.data.split('\n')
@@ -268,8 +270,14 @@ def pose_callback(data):
     
     heading_x = [robotX, robotX + 1*np.cos(robotTheta)]
     heading_y = [robotY, robotY + 1*np.sin(robotTheta)]
+    pioneer_x = [p_X, p_X + 1*np.cos(p_Theta)]
+    pioneer_y = [p_Y, p_Y + 1*np.sin(p_Theta)]
+    
     heading_1.set_xdata(heading_x)
     heading_1.set_ydata(heading_y)
+    
+    heading_2.set_xdata(pioneer_x)
+    heading_2.set_ydata(pioneer_y)
     robot_pos_plt.set_offsets([robotX, robotY])
     
     
@@ -291,7 +299,7 @@ def pose_callback(data):
     print('robotX, robotY, robotTheta :', robotX, robotY, robotTheta)
     time.sleep(0.1)
 
-    print('p_X, p_Y',p_X, p_Y)
+    print('p_X, p_Y, p_Theta',p_X, p_Y, p_Theta)
                 
 if __name__ == '__main__':
 

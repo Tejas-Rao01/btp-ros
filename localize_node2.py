@@ -28,22 +28,29 @@ robot_position_y = []
 robot_orientation = []
 
 
+# Start pos of robot
+robotStart_pos = [1.1,1.5, np.pi/2]
+
+
 # Localized robot Parameters
-robotTheta_lidar = np.pi
-robotX_lidar = 0.0
-robotY_lidar = 0
+robotTheta_centre = robotStart_pos[2]
+robotX_centre = robotStart_pos[0]
+robotY_centre = robotStart_pos[1]
 
-robotX_centre = robotX_lidar - 0.2 *  np.cos(robotTheta_lidar)
-robotY_centre = robotY_lidar - 0.2 *  np.sin(robotTheta_lidar) 
-robotTheta_centre = robotTheta_lidar 
+robotX_lidar = robotX_centre + 0.2 *  np.cos(robotTheta_centre)
+robotY_lidar = robotY_centre + 0.2 *  np.sin(robotTheta_centre) 
+robotTheta_lidar = robotTheta_centre
 
 
-P = np.zeros(shape=(3,3))
-P_odom = np.zeros(shape=(3,3))
+P = np.eye(3)*1
+P_odom = np.eye(3)*1
+
+
+
 #  Pioneer Params
-p_X = 0
-p_Y = 0
-p_Theta = np.pi
+p_X =  robotStart_pos[0]
+p_Y =  robotStart_pos[1]
+p_Theta =  robotStart_pos[2]
 
 
 wallx = []
@@ -57,10 +64,19 @@ SR = 0
 
 april_tick = 0
 
-px_old = 0
-py_old = 0
-ptheta_old = np.pi
+px_old = robotStart_pos[0]
+py_old = robotStart_pos[1]
+ptheta_old = robotStart_pos[2]
 
+
+cum_dl = 0
+cum_do = 0 
+
+April = False
+
+robotX_centre_apr = robotStart_pos[0]
+robotY_centre_apr = robotStart_pos[1]
+robotTheta_centre_apr = robotStart_pos[2]
 
 def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, walls, coords):
     plot_vars = f'{robotX} {robotY} {robotTheta} \n'
@@ -96,14 +112,14 @@ def plot_data2Str(robotX, robotY, robotTheta, p_X, p_Y, p_Theta, P, corr_walls, 
     plot_vars += '\n'
     return plot_vars
 
-def odom_to_wheeldist(delta_x, delta_y, delta_theta):
+def odom_to_wheeldist(delta_x, delta_y, delta_theta, robotTheta):
 
 
-    delta_d = np.sqrt(delta_x **2 + delta_y **2 ) 
-    
-    sr = delta_d + delta_theta * robot_params.pioneer_track_width
-    sl = delta_d - delta_theta * robot_params.pioneer_track_width
-    
+    theta_not = delta_theta / 2 + robotTheta
+    a = (delta_x+ delta_y ) * 2 / (np.cos(theta_not) + np.sin(theta_not))
+    b = delta_theta * robot_params.pioneer_track_width
+    sr = (a + b) / 2 
+    sl = (a - b) / 2
     return [sr, sl]
     
     
@@ -128,47 +144,47 @@ def odom_callback(data):
     
     global P_odom
     
-    phi = np.pi
+    phi = -robotStart_pos[2]
     
-    T = np.array([[np.cos(phi),np.sin(phi), 0],[-np.sin(phi), np.cos(phi), 0],[0, 0, 1]])
+    T = np.array([[np.cos(phi),np.sin(phi), robotStart_pos[0]],[-np.sin(phi), np.cos(phi), robotStart_pos[1]],[0, 0, 1]])
     p_Xnew = data.pose.pose.position.x 
     p_Ynew = data.pose.pose.position.y 
-    p_Thetanew = data.pose.pose.orientation.x
+
+
+    x = data.pose.pose.orientation.x
+    y = data.pose.pose.orientation.y
+    z = data.pose.pose.orientation.z
+    w = data.pose.pose.orientation.w
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    p_Thetanew = np.arctan2(t3, t4)
     
     corrected = np.matmul(T, np.array([[p_Xnew],[p_Ynew],[1]]))
     
     p_Xnew = corrected[0, 0]
     p_Ynew = corrected[1, 0]
-    p_Thetanew = p_Thetanew 
-    
-    print('p_Xnew', p_Xnew)
-    print('p_Ynew', p_Ynew)
-    print('p_Thetanew', p_Thetanew)
-    
-    delta_x = p_Xnew - p_X
-    delta_y = p_Ynew - p_Y
-    delta_theta = p_Thetanew - p_Theta
     
     
+
     p_X = p_Xnew
     p_Y = p_Ynew
     p_Theta = p_Thetanew
 
 def april_callback(data):
-    global robotX_centre
-    global robotY_centre
-    global robotTheta_centre
+    global robotX_centre_apr
+    global robotY_centre_apr
+    global robotTheta_centre_apr
     global P
     global april_tick
-    global robotX_lidar
-    global robotY_lidar
-    global robotTheta_lidar
+
+    global April
     
-    if april_tick != 10:
+    if april_tick != 15:
         april_tick += 1
         return 
     else:
         april_tick = 0
+        April = True
         print("before apriltag", robotX_centre, robotY_centre, robotTheta_centre)
         robotX_camera = data.pose.pose.position.x
         robotY_camera = data.pose.pose.position.y
@@ -181,21 +197,18 @@ def april_callback(data):
         t4 = +1.0 - 2.0 * (y * y + z * z)
         z = np.arctan2(t3, t4)
         theta = z + np.pi
-        robotTheta_centre  = theta
+        robotTheta_centre_apr  = theta
         
         T1 = np.array([[np.cos(theta), -np.sin(theta), robotX_camera],[np.sin(theta), np.cos(theta), robotY_camera],[0, 0 , 1]])
         T2 = np.array([[1,0, -0.2],[0,1, -0.1],[0, 0 , 1]])
         out = np.matmul(T1,np.matmul(T2, np.array([0, 0, 1]).reshape((3,1))))
         
-        robotX_centre = out[0].squeeze()
-        robotY_centre = out[1].squeeze()
-        P = np.eye(3)* 0.02
+        robotX_centre_apr = out[0].squeeze()
+        robotY_centre_apr = out[1].squeeze()
+        P = np.eye(3)* 0.5
         
         
-        robotX_lidar = robotX_centre + 0.2 * np.cos(robotTheta_centre)
-        robotY_lidar = robotX_centre + 0.2 * np.sin(robotTheta_centre)
-        robotTheta_lidar = robotTheta_centre
-        
+
         print("after apriltag", robotX_centre, robotY_centre, robotTheta_centre)
 def pose_callback(data):
     print("callback")
@@ -233,12 +246,14 @@ def pose_callback(data):
     global py_old
     global ptheta_old
     
+    global April
     
+    global robotX_centre_apr
+    global robotY_centre_apr
+    global robotTheta_centre_apr
     #finding th erequired points to be plotted 
-    X = []
-    Y = []
-    odometry_data =[0,SR,SL]
 
+    
     lidar_data = data.ranges
     step_size = data.angle_increment
     
@@ -246,26 +261,41 @@ def pose_callback(data):
     delta_y = p_Y - py_old
     delta_theta = p_Theta - ptheta_old
 
-    SL, SR = odom_to_wheeldist(delta_x, delta_y, delta_theta)
+    SL, SR = odom_to_wheeldist(delta_x, delta_y, delta_theta, robotTheta_centre)
+    odometry_data =[0,SR,SL]
 
 
     px_old = p_X
     py_old = p_Y
     ptheta_old = p_Theta
     
-    
+    if April == True:
+        print('april correction')
+        robotX_centre = robotX_centre_apr
+        robotY_centre = robotY_centre_apr
+        robotX_lidar = robotX_centre_apr + 0.2 * np.cos(robotTheta_lidar)
+        robotY_lidar = robotY_centre_apr + 0.2 * np.sin(robotTheta_lidar)
+        robotTheta_centre = robotTheta_centre_apr
+        robotTheta_lidar = robotTheta_centre
+        April = False
+        robotX_lidar = robotX_centre 
+        plot_data = plot_data2Str(robotX_centre,robotY_centre, robotTheta_centre, p_X, p_Y, p_Theta, P,[], [], [[0], [0]])
+        pub.publish(plot_data)
+        return 
+        
+    print('april before ekf', April)
     robotX_lidar, robotY_lidar, robotTheta_lidar, P, plot_vars=  wall_localization.localize(lidar_data, step_size, odometry_data, robotX_lidar, robotY_lidar, robotTheta_lidar, P)
     robotX_centre = robotX_lidar - 0.2 * np.cos(robotTheta_lidar)
     robotY_centre = robotY_lidar - 0.2 * np.sin(robotTheta_lidar)
     robotTheta_centre = robotTheta_lidar
+    print('april after ekf', April)
+
     
-
-
     tock = time.time()
     if plot_vars !=[]:
 
         X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
-
+        P = np.eye(3)* 0.5
 # =============================================================================
 #         print('P3AT')
 # =============================================================================

@@ -147,10 +147,6 @@ def odom_callback(data):
 #     print('p_Thetanew', p_Thetanew)
 # =============================================================================
     
-    delta_x = p_Xnew - p_X
-    delta_y = p_Ynew - p_Y
-    delta_theta = p_Thetanew - p_Theta
-    
     
     p_X = p_Xnew
     p_Y = p_Ynew
@@ -234,8 +230,8 @@ def pose_callback(data):
     delta_theta = p_Theta - ptheta_old
 
     SL, SR = odom_to_wheeldist(delta_x, delta_y, delta_theta)
-    print('SR, SL')
-    print(SR, SL)
+    print('p_X, p_Y', p_X, p_Y)
+    print('px_old py_old', px_old , py_old)
     
     px_old = p_X
     py_old = p_Y
@@ -253,9 +249,7 @@ def pose_callback(data):
     if plot_vars !=[]:
 
         X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
-# =============================================================================
-#         print('robotPos')
-# =============================================================================
+
         print(robotX_centre, robotY_centre, robotTheta_centre)
 # =============================================================================
 #         print('P3AT')

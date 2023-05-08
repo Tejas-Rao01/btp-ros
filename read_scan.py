@@ -20,7 +20,7 @@ lidar_scan = np.zeros(shape=(45, 1150))
 for i, doc in enumerate(docs):
     #print(doc.keys())
     print(i)
-    if i >= 11:
+    if i >= 10:
         break
 
     min_angle = doc['angle_min']
