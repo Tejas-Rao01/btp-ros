@@ -213,8 +213,10 @@ def pose_callback(data):
     trajectory_x.append(robotX / scale_x + x_offset)
     trajectory_y.append(-robotY / scale_y + y_offset)
 
-    p_trajectory_x.append(p_X / scale_x + x_offset)
-    p_trajectory_y.append(-p_Y / scale_y + y_offset)
+# =============================================================================
+#     p_trajectory_x.append(p_X / scale_x + x_offset)
+#     p_trajectory_y.append(-p_Y / scale_y + y_offset)
+# =============================================================================
 
     transformation_mat = np.array([ [np.cos(robotTheta), -np.sin(robotTheta), robotX],[np.sin(robotTheta), np.cos(robotTheta), robotY],[0,0,1]])
     tick= 0

@@ -28,12 +28,12 @@ class wall_detection():
      
       self.epsilon = 0.05
       self.Min_SeedSeg_len = 5
-     
-      self.Min_PTS_LS = 7
-      self.Delta = 1
+      self.max_distp2p_line = 0.5   
+      self.Min_PTS_LS = 8
+      self.Delta = 0.05
      
       self.Num_Pts= len(lidar_data)
-      self.Gmax = 1
+      self.Gmax = 0.5
       self.Min_LS_len = 0.6
       self.Min_distp2p = 0.05
       self.sub_sample_lidar(sub_sample_rate=3)
@@ -334,7 +334,12 @@ class wall_detection():
             p1, p2 = [], []
 
             for k in range(i, j):
-
+                
+                if k > i:
+                    d4 = self.dist_p2p(self.LidarPoints[k][0], self.LidarPoints[k-1][0])
+                    if d4 > self.max_distp2p_line:
+                        break
+                    
                 d1 = self.dist_p2l(self.LidarPoints[k][0], line_params)
                 if d1 > self.epsilon:
 

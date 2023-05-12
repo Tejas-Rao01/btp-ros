@@ -24,7 +24,6 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     delta_D = (SR- SL ) / 2                                               
     delta_theta = (SR - SL) / robot_params.pioneer_track_width
     
-    
 
     # get covariance matrices 
     Q = get_Q(SL, SR)    #delta_theta = (SR- SL) / (2 * b)
@@ -35,6 +34,9 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     [robotX_bar, robotY_bar, robotTheta_bar] = get_pred_pos(SL, SR, robotX, robotY, robotTheta)
     Pbar = np.matmul(np.matmul(Fp, P), np.transpose(Fp)) + np.matmul(np.matmul(Fu, Q), np.transpose(Fu))
     
+# =============================================================================
+#     print('prediction',robotX_bar, robotY_bar, robotTheta_bar )
+# =============================================================================
     
 
     wall_detector = wall_detection.wall_detection(lidar_data, robotX, robotY, robotTheta)
@@ -96,7 +98,9 @@ def kalman_filter(robotPos, lidar_data, P, SL, SR):
     for ind in wall_inds:
         corresponded_walls.append(walls[ind])
 
-
+# =============================================================================
+#     print('corrected pose', robotX, robotY, robotTheta )
+# =============================================================================
     return [robotX, robotY, robotTheta, P, corresponded_walls, walls]
 
 

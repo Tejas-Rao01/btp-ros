@@ -16,10 +16,12 @@ import wall_ekf_debug
 def localize(lidar_data, step_size, odometry_data, robotX, robotY, robotTheta, P, flag):
     
     
-    lidar_data = process_lidar_data(lidar_data, step_size)
+    lidar_data = process_lidar_data(lidar_data, step_size, flag)
+    derivatives = compute_derivative(lidar_data)
+    lidar_data = clean_data(lidar_data, derivatives)
     #plt.scatter(robotX, robotY,c='red', marker='x')
     # Check 
-    [odomTime, SL, SR] = odometry_data
+    [odomTime, SR, SL] = odometry_data
     print('odometry data', odometry_data)
     #walls = []
     print('before', robotX, robotY, robotTheta)
@@ -93,16 +95,20 @@ def get_coords_wrt_robot(robotX, robotY, robotTheta, lidar_data):
     return coords      
 
 
-def process_lidar_data(lidar_data, step_size):
+def process_lidar_data(lidar_data, step_size, flag):
     
     lidar_data_processed = []
     #Start angle
     angle = 0
     
+    if flag ==True:
+        step= 100
+    else:
+        step = 1
     #num of lidar points  
     num_points = len(lidar_data)
     
-    for i in range(0,num_points,1):        
+    for i in range(0,num_points, step):        
         r = lidar_data[i]
         if r == np.inf:
             angle += step_size 
