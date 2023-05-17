@@ -291,7 +291,7 @@ def pose_callback(data):
     
 
 
-    if localize_tick == 0:
+    if localize_tick == 1:
         print("localizing")
         localize_tick = 0 
         robotX_lidar, robotY_lidar, robotTheta_lidar, P, plot_vars=  wall_localization.localize(lidar_data, step_size, odometry_data, robotX_lidar, robotY_lidar, robotTheta_lidar, P, False)
@@ -302,7 +302,7 @@ def pose_callback(data):
         if plot_vars !=[]:
             
             X1,robotX, robotY, robotTheta, corr_walls, walls = plot_vars
-            P = np.eye(3)* 0.5
+            P = np.eye(3)* 0.07
 
             plot_data = plot_data2Str(robotX_centre,robotY_centre, robotTheta_centre, p_X, p_Y, p_Theta, P,corr_walls, walls, X1)
             pub.publish(plot_data)
